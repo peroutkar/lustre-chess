@@ -1,0 +1,200 @@
+type Color = enum {WHITE, BLACK, _____};
+type Piece = enum {_PAWN_, KNIGHT, BISHOP, _ROOK_, QUEEN_, _KING_, ______};
+type Position = struct {r: int; c: int};
+
+-- Assuming:
+-- (0, 0)
+--   _ _ _ _ _ _ _ _ Black
+--   _ _ _ _ _ _ _ _
+--   _ _ _ _ _ _ _ _
+--   _ _ _ _ _ _ _ _
+--   _ _ _ _ _ _ _ _
+--   _ _ _ _ _ _ _ _
+--   _ _ _ _ _ _ _ _
+--   _ _ _ _ _ _ _ _ White
+--                (8, 8)
+
+node abs (
+	i: int;
+) returns (
+	o: int;
+);
+let
+	o = if (i >= 0) then i else -i;
+tel;
+
+node inBounds (
+	p: Position	
+) returns (
+	o: bool
+);
+let
+	o = p.r >= 0 and p.r <= 7 and p.c >= 0 and p.c <= 7;
+tel;
+
+node iMove(
+	f: Position;
+	b_c: Color^8^8;
+	b_p: Piece^8^8;
+) returns (
+	i: Position;
+);
+var
+	c: Color; -- Who moved i -> f?
+	p: Piece;
+let
+	c = b_c[f.r][f.c];
+	p = b_p[f.r][f.c];
+	assert (p = _PAWN_) => i = iPawnMove(c, f);
+	assert (p = KNIGHT) => i = iKnightMove(f);
+	assert (p = BISHOP) => i = iBishopMove(f);
+	assert (p = _ROOK_) => i = iRookMove(f);
+	assert (p = QUEEN_) => i = iQueenMove(f);
+	assert (p = _KING_) => i = iKingMove(f);
+tel;
+
+node iPawnMove (
+	c: Color;
+	f: Position;
+) returns (
+	i: Position;
+);
+let
+	assert c <> _____;
+	assert (c = WHITE) => (
+		((f.r = i.r + 2) and (f.c = i.c) and (f.r = 3)) or
+		((f.r = i.r + 1) and (f.c = i.c - 1 or f.c = i.c or f.c = i.c + 1))
+	);
+	assert (c = BLACK) => (
+		((f.r = i.r - 2) and (f.c = i.c) and (f.r = 4)) or
+		((f.r = i.r - 1) and (f.c = i.c - 1 or f.c = i.c or f.c = i.c + 1))
+	);
+tel;
+
+node iKnightMove (
+	f: Position;
+) returns (
+	i: Position;
+);
+var
+	r_mag: int;
+	c_mag: int;
+let
+	r_mag = abs(f.r - i.r);
+	c_mag = abs(f.c - i.c);
+	assert r_mag + c_mag = 3;
+	assert r_mag <> 0;
+	assert c_mag <> 0;
+tel;
+
+node iBishopMove (
+	f: Position;
+) returns (
+	i: Position;
+);
+var
+	r_mag: int;
+	c_mag: int;
+let
+	r_mag = abs(f.r - i.r);
+	c_mag = abs(f.c - i.c);
+	assert r_mag = c_mag;
+	assert r_mag + c_mag > 0;
+tel;
+
+node iRookMove (
+	f: Position;
+) returns (
+	i: Position;
+);
+var
+	r_mag: int;
+	c_mag: int;
+let
+	r_mag = abs(f.r - i.r);
+	c_mag = abs(f.c - i.c);
+	assert r_mag = 0 or c_mag = 0;
+	assert r_mag <> 0 or c_mag <> 0;
+tel;
+
+node iQueenMove (
+	f: Position;
+) returns (
+	i: Position;
+);
+let
+	assert i = iBishopMove(f) or i = iRookMove(f);
+tel;
+
+node iKingMove (
+	f: Position;
+) returns (
+	i: Position;
+);
+let
+	assert abs(f.r - i.r) = 1;
+	assert abs(f.c - i.c) = 1;
+tel;
+
+node main(
+	i_wt: Color;
+) returns (
+	-- Initial Board Layout--
+	i_b_c: Color^8^8;
+	i_b_p: Piece^8^8;
+	-- Board --
+	b_c: Color^8^8;
+	b_p: Piece^8^8;
+	-- Whose Turn? --
+	wt: Color;
+	-- Just Moved --
+	jmPos: Position;
+	jmP: Piece;
+	jmC: Color;
+	-- Just Captured --
+	jcP: Piece;
+	jcC: Color;	
+	-- Steps --
+	s: int;
+);
+var
+	im: Position;
+let
+	-- Initialize Board --
+	i_b_p[i][j] =
+		if (i = 0 and j = 0) then BISHOP
+		else ______;
+	i_b_c[i][j] =
+		if (i = 0 and j = 0) then WHITE
+		else _____;
+	assert b_c = i_b_c -> true;
+	assert b_p = i_b_p -> true;
+
+	assert(i_wt = WHITE or i_wt = BLACK);
+	wt = i_wt -> if (pre wt = WHITE) then BLACK else WHITE;
+
+	assert b_p[jmPos.r][jmPos.c] <> ______;
+	assert b_c[jmPos.r][jmPos.c] = (if wt = WHITE then BLACK else WHITE);
+
+	im = iMove(jmPos, b_c, b_p);
+	assert inBounds(im);
+	assert inBounds(jmPos);
+	jmP = b_p[jmPos.r][jmPos.c];
+	jmC = b_c[jmPos.r][jmPos.c];
+
+	assert jcC = wt or jcC = _____;
+	assert jcC = _____ => jcP = ______ and jcP = ______ => jcC = _____;
+
+	b_p[i][j] =
+		if (i = pre(jmPos.r) and j = pre(jmPos.c)) then pre(jcP) else --Where it moved to - either empty or it captured a piece of the color
+		if (i = pre(im.r) and j = pre(im.c)) then (pre(jmP)) else --Where it moved from
+			pre(b_p[i][j]); -- All other pieces unchanged
+
+	b_c[i][j] =
+		if (i = pre(jmPos.r) and j = pre(jmPos.c)) then pre(jcC) else
+		if (i = pre(im.r) and j = pre(im.c)) then (pre(jmC)) else
+			pre(b_c[i][j]); -- All other pieces unchanged
+
+	assert s = (0 -> pre s + 1);
+	--%PROPERTY (s <> 3);
+tel;
