@@ -1,0 +1,211 @@
+type Piece = {t: Type; c: Color;};
+type Type = enum {K, Q, R, B, N, P, _};
+type Color = enum {WHITE, BLACK, _____};
+
+node previous (post: Piece^8^8; whoMoved: Color) returns (prev: Piece^8^8);
+var
+	to_r: int;
+	to_c: int;
+	from_r: int;
+	from_c: int;
+	piece_that_moved: Piece;
+let
+	assert forall (i: int) (forall (j: int) (prev[i][j] = if (i = from_r and j = from_c) then (piece_that_moved) else (if (i = to_r and j = to_c) then (Piece{t=_;c=_____}) else (post[i][j])))); -- TODO - this is assuming it doesn't caputre a piece rn
+	
+	piece_that_moved = post[to_r][to_c];
+
+	assert piece_that_moved.c = whoMoved;
+
+	from_r, from_c =
+		if (piece_that_moved.t = P) then
+			pawn_move(post, to_r, to_c, whoMoved)
+		else if (piece_that_moved.t = N) then
+			knight_move(post, to_r, to_c)
+		else if (piece_that_moved.t = B) then
+			bishop_move(post, to_r, to_c)
+		else if (piece_that_moved.t = R) then
+			rook_move(post, to_r, to_c)
+		else if (piece_that_moved.t = Q) then
+			queen_move(post, to_r, to_c)
+		else if (piece_that_moved.t = K) then
+			king_move(post, to_r, to_c)
+		else
+			(-1, -1);
+
+	to_r = floating(1, tick());
+	to_c = floating(2, tick());
+
+	assert in_range(to_r);
+	assert in_range(to_c);
+	assert in_range(from_r);
+	assert in_range(from_c);
+
+	assert piece_that_moved.c = whoMoved;
+
+	-- don't capture a piece of your own
+	assert prev[to_r][to_c].c <> whoMoved;
+tel;
+
+node floating (id: int; t: int) returns (a: int);
+let
+tel;
+
+node in_range (c: int) returns (o: bool);
+let
+	o = c >= 0 and c <= 7;
+tel;
+
+node pawn_move (b: Piece^8^8; to_r: int; to_c: int; c: Color) returns (from_r: int; from_c: int);
+let
+	assert ((c = WHITE) => (
+		-- not capture
+		((from_r = 6) and (to_r = 5 or to_r = 4) and (from_c = to_c)) or
+		-- capture
+		(((from_r = to_r + 1)) and ((from_c = to_c - 1) or (from_c = to_c + 1)))
+	));
+	assert (c = WHITE) => (from_r <> 7);
+
+	assert ((c = BLACK) => (
+		-- no capture
+		((from_r = 1) and (to_r = 2 or to_r = 2) and (from_c = to_c)) or 
+		-- capture
+		(((from_r = to_r - 1)) and ((from_c = to_c - 1) or (from_c = to_c + 1)))
+	));
+	assert (c = BLACK) => (from_r <> 0);
+tel;
+
+node knight_move (b: Piece^8^8; to_r: int; to_c: int) returns (from_r: int; from_c: int);
+var
+	h_disp: int;
+	v_disp: int;
+let
+	h_disp = to_r - from_r;
+	v_disp = to_c - from_c;
+
+	assert (abs(h_disp) = 1 and abs(v_disp) = 2) or (abs(h_disp) = 2 and abs(v_disp) = 1);
+
+	-- no move restrictions
+tel;
+
+node bishop_move (b: Piece^8^8; to_r: int; to_c: int) returns (from_r: int; from_c: int);
+var
+	h_disp: int;
+	v_disp: int;
+let
+	h_disp = to_r - from_r;
+	v_disp = to_c - from_c;
+
+	assert abs(h_disp) = abs(v_disp);
+	assert abs(h_disp) >= 1 and abs(v_disp) >= 1;
+
+	
+tel;
+
+node rook_move (b: Piece^8^8; to_r: int; to_c: int) returns (from_r: int; from_c: int);
+var
+	h_disp: int;
+	v_disp: int;
+let
+	h_disp = to_r - from_r;
+	v_disp = to_c - from_c;
+
+	assert h_disp = 0 or v_disp = 0;
+	assert h_disp >= 1 or v_disp >= 1;
+
+	-- Don't go through other pieces
+	assert (forall (i: int) (((h_disp > 0) and (i > from_c) and (i < to_c)) => (b[from_r][i] = _E)));
+	assert (forall (i: int) (((h_disp < 0) and (i < from_c) and (i > to_c)) => (b[from_r][i] = _E)));
+	assert (forall (i: int) (((v_disp > 0) and (i > from_c) and (i < to_c)) => (b[i][from_c] = _E)));
+	assert (forall (i: int) (((h_disp < 0) and (i < from_c) and (i > to_c)) => (b[i][from_c] = _E)));
+tel;
+
+node queen_move (b: Piece^8^8; to_r: int; to_c: int) returns (from_r: int; from_c: int);
+let
+	assert ((from_r, from_c) = bishop_move(b, to_r, to_c)) or ((from_r, from_c) = rook_move(b, to_r, to_c));
+tel;
+
+node king_move (b: Piece^8^8; to_r: int; to_c: int) returns (from_r: int; from_c: int);
+var
+	h_disp: int;
+	v_disp: int;
+let
+	h_disp = to_r - from_r;
+	v_disp = to_c - from_c;
+
+	assert abs(h_disp) = 0 or abs(h_disp) = 1;
+	assert abs(v_disp) = 0 or abs(v_disp) = 1;
+	assert abs(h_disp) + abs(v_disp) = 1 or abs(h_disp) + abs(v_disp) = 2;
+tel;
+
+node abs (a: int) returns (z: int);
+let
+	z = if (a >= 0) then a else -a;
+tel;
+
+node tick () returns (t: int);
+let
+	t = 0 -> (pre t + 1);
+tel;
+
+const _E = Piece{t=_;c=_____};
+const WK = Piece{t=K;c=WHITE};
+const BK = Piece{t=K;c=BLACK};
+const WQ = Piece{t=Q;c=WHITE};
+const BQ = Piece{t=Q;c=BLACK};
+const WR = Piece{t=R;c=WHITE};
+const BR = Piece{t=R;c=BLACK};
+const WB = Piece{t=B;c=WHITE};
+const BB = Piece{t=B;c=BLACK};
+const WN = Piece{t=N;c=WHITE};
+const BN = Piece{t=N;c=BLACK};
+const WP = Piece{t=P;c=WHITE};
+const BP = Piece{t=P;c=BLACK};
+
+const test =
+		[
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, WR, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, BR, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E]
+		];
+
+const puzzle =
+		[
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, BR, _E, BB, _E, _E, _E, _E],
+			[WB, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, _E, _E, _E, _E, _E],
+			[_E, _E, _E, BK, _E, _E, _E, _E]
+		];
+
+node main (
+	whoseTurn: Color;
+	WK_init_r: int;
+	WK_init_c: int;
+) returns (
+	board: Piece^8^8;
+	init: Piece^8^8;
+	prev: Piece^8^8;
+);
+var
+	whoMoved: Color;
+let
+	init = test;
+	assert (forall (i: int) (forall (j: int) (if (i = WK_init_r and j = WK_init_c) then (board[i][j] = WK) else (board[i][j] = init[i][j])))) -> true;
+	assert (init[WK_init_r][WK_init_c] = _E);
+	assert forall (i: int) (forall (j: int) (prev[i][j] = previous(board, whoMoved)[i][j]));
+	assert true -> board = pre prev;
+
+	assert whoseTurn = WHITE or whoseTurn = BLACK;
+	whoMoved = if (whoseTurn = WHITE) then BLACK else WHITE;
+	assert whoMoved = ((if (whoseTurn = WHITE) then BLACK else WHITE) -> pre whoseTurn);
+
+	--%PROPERTY tick() <> 3;
+tel;
